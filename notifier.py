@@ -29,17 +29,15 @@ class UpstreamManager(metaclass=ABCMeta):
         session = aiohttp.ClientSession()
         return cls(upstream_url, session)
 
-    @abstractmethod
     async def connect(self, *, force: bool = False) -> None:
-        raise NotImplementedError
+        pass
 
     @abstractmethod
     async def send(self, data: str) -> None:
         raise NotImplementedError
 
-    @abstractmethod
     async def disconnect(self) -> None:
-        raise NotImplementedError
+        pass
 
     async def cleanup(self) -> None:
         await self.session.close()
@@ -55,6 +53,7 @@ class WebsocketUpstreamManager(UpstreamManager):
         for retries in range(1, 5):
             try:
                 await self.connection.send_str(data)
+                break
             except (ConnectionResetError, ConnectionAbortedError):
                 self.logger.exception('Got exception while send message')
                 await self.connect(force=True)
@@ -84,14 +83,8 @@ class WebsocketUpstreamManager(UpstreamManager):
 
 class PlainHttpUpstreamManager(UpstreamManager):
 
-    async def connect(self, *, force: bool = False) -> None:
-        pass
-
     async def send(self, data: str) -> None:
-        await self.session.post(self.upstream_url, data=data)
-
-    async def disconnect(self) -> None:
-        pass
+        await self.session.post(self.upstream_url, data=data, headers={'content-type': 'application/json'})
 
 
 class ApiClient:
