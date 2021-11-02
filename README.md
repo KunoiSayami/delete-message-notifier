@@ -1,5 +1,7 @@
 # Delete message notifier
 
+## DUE TO MY ACCOUNT GOT TELEGRAM BANNED, THIS PROJECT IS NO LONGER MAINTENANCE
+
 ## Install depends
 
 ```shell
