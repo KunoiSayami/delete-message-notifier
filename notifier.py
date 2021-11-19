@@ -1,14 +1,32 @@
 #!/usr/bin/env python3
+# Copyright (C) 2021 KunoiSayami and contributors
+#
+# This module is part of delete-message-notifier and is released under
+# the AGPL v3 License: https://www.gnu.org/licenses/agpl-3.0.txt
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
 from __future__ import annotations
 
 import ast
+import argparse
 import asyncio
 import json
 import logging
 import sys
 
 from abc import ABCMeta, abstractmethod
-from typing import Union, Sequence, Optional
+from typing import Sequence
 
 import aiohttp
 import pyrogram
@@ -47,7 +65,7 @@ class UpstreamManager(metaclass=ABCMeta):
 class WebsocketUpstreamManager(UpstreamManager):
     def __init__(self, upstream_url: str, session: aiohttp.ClientSession):
         super().__init__(upstream_url, session)
-        self.connection: Optional[aiohttp.ClientWebSocketResponse] = None
+        self.connection: aiohttp.ClientWebSocketResponse | None = None
 
     async def send(self, data: str) -> None:
         for retries in range(1, 5):
@@ -92,7 +110,7 @@ class ApiClient:
                  session_name: str,
                  api_id: int,
                  api_hash: str,
-                 target_group: Union[int, Sequence[int]],
+                 target_group: int | Sequence[int] | None,
                  upstream: UpstreamManager):
         self.app = Client(session_name, api_id, api_hash)
         if isinstance(target_group, int):
@@ -109,7 +127,7 @@ class ApiClient:
                      session_name: str,
                      api_id: int,
                      api_hash: str,
-                     target_group: Union[int, Sequence[int]],
+                     target_group: int | Sequence[int] | None,
                      upstream_url: str) -> ApiClient:
         if upstream_url.startswith('ws'):
             upstream = WebsocketUpstreamManager.create(upstream_url)
@@ -120,7 +138,7 @@ class ApiClient:
     async def raw_handler(self, _client: Client, update: Update, _users: dict, _chats: dict) -> None:
         if isinstance(update, pyrogram.raw.types.UpdateDeleteChannelMessages):
             group_id = -(update.channel_id + 1000000000000)
-            if self.target_group == 'any' or group_id in self.target_group:
+            if self.target_group is None or group_id in self.target_group:
                 await self.upstream.send(json.dumps(dict(id=group_id, delete_messages=update.messages)))
 
     async def start(self) -> None:
@@ -139,22 +157,27 @@ class ApiClient:
         await pyrogram.idle()
 
 
-async def main():
+async def main(args: argparse.Namespace):
     client = await ApiClient.create(
-        'notifier', int(sys.argv[1]), sys.argv[2],
-        'any' if sys.argv[3] == 'any' else ast.literal_eval(sys.argv[3]),
-        sys.argv[4])
+        'notifier', args.api_id, args.api_hash,
+        None if args.groups == 'any' else ast.literal_eval(args.groups),
+        args.upstream)
     await client.start()
     await client.idle()
     await client.stop()
     await client.cleanup()
 
 if __name__ == '__main__':
-    if len(sys.argv) < 5:
-        print('Usage:', sys.argv[0], '<api id> <api hash> <listen group(s)> <upstream url>', file=sys.stderr)
-        raise SystemExit
+    parser = argparse.ArgumentParser(prog=sys.argv[0])
+    parser.add_argument('api_id', help='Telegram App api_id', type=int)
+    parser.add_argument('api_hash', help='Telegram App api hash')
+    parser.add_argument('upstream', help='Upstream url, support websocket and HTTP POST')
+    parser.add_argument('groups', nargs='?', default='any',
+                        help='Listen to group(s), groups should separate by commas. '
+                             'Or simply leave blank to listen all groups.')
+    args_ = parser.parse_args()
     logging.basicConfig(level=logging.DEBUG,
                         format='%(asctime)s - %(levelname)s - %(name)s - %(funcName)s - %(lineno)d - %(message)s')
     logging.getLogger('pyrogram').setLevel(logging.WARNING)
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(main())
+    loop.run_until_complete(main(args_))

@@ -1,7 +1,5 @@
 # Delete message notifier
 
-## DUE TO MY ACCOUNT GOT TELEGRAM BANNED, THIS PROJECT IS NO LONGER MAINTENANCE
-
 ## Install depends
 
 ```shell
@@ -11,12 +9,13 @@ pip3 install -r requirements.txt
 ## Usage
 
 ```plain
-./notifier.py <api id> <api hash> <listen group(s)> <upstream url>
+./notifier.py [<api id> <api hash> <upstream url> [listen group(s)]] [-h]
 ```
 
 * You can obtain `api id` and `api hash` from [telegram](https://my.telegram.org/apps)
 * Groups should separate by commas
 * Upstream url support websocket and plain http (use POST method)
+* Use `./notifier.py -h` to view more help messages.
 
 ## License
 
