@@ -119,7 +119,8 @@ class ApiClient:
 
     async def raw_handler(self, _client: Client, update: Update, _users: dict, _chats: dict) -> None:
         if isinstance(update, pyrogram.raw.types.UpdateDeleteChannelMessages):
-            if (group_id := -(update.channel_id + 1000000000000)) in self.target_group:
+            group_id = -(update.channel_id + 1000000000000)
+            if self.target_group == 'any' or group_id in self.target_group:
                 await self.upstream.send(json.dumps(dict(id=group_id, delete_messages=update.messages)))
 
     async def start(self) -> None:
@@ -140,7 +141,9 @@ class ApiClient:
 
 async def main():
     client = await ApiClient.create(
-        'notifier', int(sys.argv[1]), sys.argv[2], ast.literal_eval(sys.argv[3]), sys.argv[4])
+        'notifier', int(sys.argv[1]), sys.argv[2],
+        'any' if sys.argv[3] == 'any' else ast.literal_eval(sys.argv[3]),
+        sys.argv[4])
     await client.start()
     await client.idle()
     await client.stop()
