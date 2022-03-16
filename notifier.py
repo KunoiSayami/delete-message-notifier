@@ -30,9 +30,9 @@ from typing import Sequence
 
 import aiohttp
 import pyrogram
-from pyrogram import Client
-from pyrogram.types import Update
-from pyrogram.handlers import RawUpdateHandler
+from pyrogram import Client, filters
+from pyrogram.handlers import DeletedMessagesHandler
+from pyrogram.types import Message
 
 
 class UpstreamManager(metaclass=ABCMeta):
@@ -118,7 +118,7 @@ class ApiClient:
         else:
             self.target_group = target_group
         self.upstream = upstream
-        self.app.add_handler(RawUpdateHandler(self.raw_handler))
+        self.app.add_handler(DeletedMessagesHandler(self.deleted_message_handler, filters.channel | filters.group))
         self.logger = logging.getLogger('ApiClient')
         self.logger.setLevel(logging.DEBUG)
 
@@ -135,11 +135,10 @@ class ApiClient:
             upstream = PlainHttpUpstreamManager.create(upstream_url)
         return cls(session_name, api_id, api_hash, target_group, await upstream)
 
-    async def raw_handler(self, _client: Client, update: Update, _users: dict, _chats: dict) -> None:
-        if isinstance(update, pyrogram.raw.types.UpdateDeleteChannelMessages):
-            group_id = -(update.channel_id + 1000000000000)
-            if self.target_group is None or group_id in self.target_group:
-                await self.upstream.send(json.dumps(dict(id=group_id, delete_messages=update.messages)))
+    async def deleted_message_handler(self, _: Client, messages: Sequence[Message]) -> None:
+        chat_id = messages[0].chat.id
+        if self.target_group is None or chat_id in self.target_group:
+            await self.upstream.send(json.dumps(dict(id=chat_id, delete_messages=[m.message_id for m in messages])))
 
     async def start(self) -> None:
         await self.upstream.connect()
@@ -179,5 +178,4 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG,
                         format='%(asctime)s - %(levelname)s - %(name)s - %(funcName)s - %(lineno)d - %(message)s')
     logging.getLogger('pyrogram').setLevel(logging.WARNING)
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main(args_))
+    asyncio.run(main(args_))
