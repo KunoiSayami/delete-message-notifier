@@ -118,7 +118,7 @@ class ApiClient:
         else:
             self.target_group = target_group
         self.upstream = upstream
-        self.app.add_handler(DeletedMessagesHandler(self.deleted_message_handler, filters.channel))
+        self.app.add_handler(DeletedMessagesHandler(self.deleted_message_handler, filters.channel | filters.group))
         self.logger = logging.getLogger('ApiClient')
         self.logger.setLevel(logging.DEBUG)
 
