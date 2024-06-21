@@ -162,7 +162,7 @@ async def main(args: argparse.Namespace):
         None if args.groups == 'any' else ast.literal_eval(args.groups),
         args.upstream)
     await client.start()
-    await client.idle()
+    await pyrogram.idle()
     await client.stop()
     await client.cleanup()
 
